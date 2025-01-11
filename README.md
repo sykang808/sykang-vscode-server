@@ -27,15 +27,15 @@
    - Private 서브넷에 컨테이너 배치
    - Container Insights 활성화로 모니터링 강화
    - CloudWatch Logs 통합
-   - Amazon Linux 2 기반 컨테이너 (AWS CLI 기본 설치)
-   - SSH 서버 실행
+   - Amazon Linux 2 기반 컨테이너
+   - 개발 도구 사전 설치 (Python, Java, Node.js)
 
    EC2 배포의 경우:
 
    - Public 서브넷에 EC2 인스턴스 배치
-   - Amazon Linux 2 기반 (AWS CLI 기본 설치)
+   - Amazon Linux 2023 기반
    - T3.medium 인스턴스 타입
-   - SSH 서버 설정
+   - 개발 도구 사전 설치 (Python, Java, Node.js)
 
 3. **네트워크 접근**
 
@@ -119,7 +119,7 @@
    Fargate 배포의 경우:
 
    ```bash
-   ssh -i <SSHKeyName>.pem ec2-user@<LoadBalancerDNS>
+   ssh -i <SSHKeyName>.pem root@<LoadBalancerDNS>
    ```
 
    EC2 배포의 경우:
@@ -128,7 +128,72 @@
    ssh -i <SSHKeyName>.pem ec2-user@<InstancePublicIP>
    ```
 
-   > 참고: CloudFormation 출력에서 SSHCommand 값을 확인하여 정확한 접속 명령어를 사용할 수 있습니다.
+## 개발 환경
+
+인스턴스에는 다음과 같은 개발 도구들이 사전 설치되어 있습니다:
+
+### 1. Python 개발 환경
+
+- Python 3 최신 버전
+- pip3 (최신 버전)
+- virtualenv
+- python3-devel (개발 헤더 및 라이브러리)
+- setuptools, wheel
+
+사용 예시:
+
+```bash
+# 가상환경 생성
+python3 -m venv myenv
+source myenv/bin/activate
+
+# 패키지 설치
+pip install <package-name>
+```
+
+### 2. Java 개발 환경
+
+- Amazon Corretto JDK 17
+- Maven
+
+사용 예시:
+
+```bash
+# Java 버전 확인
+java -version
+
+# Maven 프로젝트 생성
+mvn archetype:generate
+```
+
+### 3. Node.js 개발 환경
+
+- nvm (Node Version Manager)
+- Node.js LTS 버전
+- npm
+
+사용 예시:
+
+```bash
+# EC2의 경우
+source /etc/profile  # nvm 활성화
+
+# Node.js 버전 확인
+node --version
+
+# 다른 Node.js 버전 설치
+nvm install <version>
+```
+
+### 4. 기본 개발 도구
+
+- Git
+- curl
+- wget
+- gcc/g++
+- make
+- Development Tools (EC2의 경우)
+- AWS CLI v2
 
 ## VS Code Remote SSH 설정
 
@@ -156,19 +221,6 @@
 
 3. VS Code 명령 팔레트(F1)에서 "Remote-SSH: Connect to Host"를 선택하고 배포 타입에 따라 "dev-container" 또는 "dev-instance"를 선택합니다.
 
-## 환경 설정
-
-개발 환경에는 다음 도구들이 기본적으로 설치되어 있습니다:
-
-- Git
-- curl
-- wget
-- gcc/gcc-c++
-- make
-- AWS CLI (기본 설치)
-
-추가 도구가 필요한 경우 SSH 접속 후 `yum install`을 통해 설치할 수 있습니다.
-
 ## 모니터링
 
 Fargate 배포의 경우:
@@ -179,7 +231,6 @@ Fargate 배포의 경우:
    - CPU, 메모리, 네트워크 사용량 등 모니터링
 
 2. **CloudWatch Logs**
-
    - 컨테이너 로그는 CloudWatch Logs에서 확인 가능
    - 로그 그룹: `/aws/ecs/dev-container`
 
@@ -190,80 +241,64 @@ EC2 배포의 경우:
    - EC2 메트릭을 통해 인스턴스 상태 확인
    - CPU, 메모리, 네트워크 사용량 등 모니터링
 
-2. **CloudWatch Logs**
-
-   - 시스템 로그 및 애플리케이션 로그 확인 가능
-   - EC2 인스턴스에서 CloudWatch Logs 에이전트 설정 필요
-
-공통:
-
-1. **VPC Flow Logs**
+2. **VPC Flow Logs**
    - VPC 네트워크 트래픽 모니터링
    - 보안 분석 및 문제 해결에 활용
-
-## 비용 최적화
-
-Fargate 배포의 경우:
-
-1. Fargate Spot 사용 고려
-2. 사용하지 않는 시간대에 서비스 중지
-
-EC2 배포의 경우:
-
-1. Spot 인스턴스 사용 고려
-2. 자동 중지/시작 스케줄링 설정
-
-## 문제 해결
-
-Fargate 배포의 경우:
-
-1. **SSH 접속 불가**
-
-   - 보안 그룹 인바운드 규칙 확인
-   - NLB 대상 그룹 상태 확인
-   - ECS 서비스 상태 확인
-   - 컨테이너 로그 확인
-   - SSH 키 파일 권한이 400인지 확인
-
-2. **성능 이슈**
-   - Container Insights에서 리소스 사용량 확인
-   - ECS 서비스 이벤트 확인
-   - CloudWatch 로그에서 오류 확인
-
-EC2 배포의 경우:
-
-1. **SSH 접속 불가**
-
-   - 보안 그룹 인바운드 규칙 확인
-   - 인스턴스 상태 확인
-   - 시스템 로그 확인
-   - SSH 키 파일 권한이 400인지 확인
-   - 인스턴스 네트워크 설정 확인
-
-2. **성능 이슈**
-   - CloudWatch 메트릭에서 리소스 사용량 확인
-   - 시스템 로그에서 오류 확인
-   - 인스턴스 상태 점검 결과 확인
 
 ## 보안 설정
 
 1. SSH 접속 보안
 
-   - 패스워드 인증이 비활성화되어 있음
+   - 패스워드 인증 비활성화
    - SSH 키 기반 인증만 허용
-   - PermitRootLogin이 prohibit-password로 설정되어 있음
+   - 루트 로그인 비활성화
 
-2. 접속 제한
+2. 네트워크 보안
 
-   - 특정 IP 대역에서만 접속을 허용하려면 보안 그룹 규칙 수정
-   - 기본적으로 모든 IP에서 SSH 접속 가능
+   - 보안 그룹을 통한 SSH 접근 제어
+   - VPC Flow Logs를 통한 네트워크 트래픽 모니터링
 
 3. SSH 키 관리
-   - SSH 키는 AWS SSM Parameter Store에 안전하게 저장됨
-   - 필요한 경우 새로운 키 페어 생성 가능
+   - SSH 키는 AWS SSM Parameter Store에 안전하게 저장
+   - 자동 생성된 키 페어 사용
+
+## 문제 해결
+
+1. **Node.js 관련 문제**
+
+   ```bash
+   # nvm 활성화 (EC2의 경우)
+   source /etc/profile
+
+   # Node.js 재설치
+   nvm install --lts
+   ```
+
+2. **Python 가상환경 문제**
+
+   ```bash
+   # 가상환경 생성 실패 시
+   python3 -m pip install --upgrade virtualenv
+   ```
+
+3. **Java 관련 문제**
+
+   ```bash
+   # Java 버전 확인
+   java -version
+
+   # Maven 설정 확인
+   mvn -version
+   ```
+
+4. **SSH 접속 문제**
+   - 키 파일 권한이 400인지 확인
+   - 보안 그룹 인바운드 규칙 확인
+   - 올바른 사용자 이름 사용 (EC2: ec2-user, Fargate: root)
 
 ## 참고 자료
 
 - [AWS CDK Documentation](https://docs.aws.amazon.com/cdk/latest/guide/home.html)
 - [VS Code Remote Development](https://code.visualstudio.com/docs/remote/remote-overview)
-- [ECS Best Practices](https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/intro.html)
+- [Amazon Corretto JDK](https://docs.aws.amazon.com/corretto/latest/corretto-17-ug/what-is-corretto-17.html)
+- [Node Version Manager](https://github.com/nvm-sh/nvm)

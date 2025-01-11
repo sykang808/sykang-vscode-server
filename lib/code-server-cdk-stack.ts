@@ -18,26 +18,26 @@ export class CodeServerCdkStack extends cdk.Stack {
     const vpc = new ec2.Vpc(this, 'DevVpc', {
       maxAzs: 2,
       natGateways: props.deploymentType === 'fargate' ? 1 : 0,
-      subnetConfiguration: props.deploymentType === 'fargate' 
+      subnetConfiguration: props.deploymentType === 'fargate'
         ? [
-            {
-              name: 'Public',
-              subnetType: ec2.SubnetType.PUBLIC,
-              cidrMask: 24,
-            },
-            {
-              name: 'Private',
-              subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-              cidrMask: 24,
-            },
-          ]
+          {
+            name: 'Public',
+            subnetType: ec2.SubnetType.PUBLIC,
+            cidrMask: 24,
+          },
+          {
+            name: 'Private',
+            subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+            cidrMask: 24,
+          },
+        ]
         : [
-            {
-              name: 'Public',
-              subnetType: ec2.SubnetType.PUBLIC,
-              cidrMask: 24,
-            },
-          ],
+          {
+            name: 'Public',
+            subnetType: ec2.SubnetType.PUBLIC,
+            cidrMask: 24,
+          },
+        ],
       flowLogs: {
         'flow-logs': {
           destination: ec2.FlowLogDestination.toCloudWatchLogs(),
@@ -150,11 +150,20 @@ export class CodeServerCdkStack extends cdk.Stack {
           'KEY_NAME': keyName,
         },
         command: [
-          '/bin/bash', 
-          '-c', 
+          '/bin/bash',
+          '-c',
           [
-          'yum update -y',
-          'yum install -y openssh-server git curl wget gcc gcc-c++ make openssl-devel unzip tar procps python3 python3-pip',
+            'yum update -y',
+            'yum install -y openssh-server git curl wget gcc gcc-c++ make openssl-devel unzip tar procps',
+            // Python 설치
+            'yum install -y python3 python3-pip python3-devel',
+            'pip3 install --upgrade pip setuptools wheel virtualenv',
+            // Java 설치
+            'yum install -y java-17-amazon-corretto java-17-amazon-corretto-devel maven',
+            // Node.js 설치
+            'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash',
+            'export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm install --lts && nvm use --lts',
+            // AWS CLI 설치
             'curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" -s',
             'unzip -q awscliv2.zip',
             './aws/install',
@@ -245,7 +254,7 @@ export class CodeServerCdkStack extends cdk.Stack {
       securityGroup.addIngressRule(
         ec2.Peer.anyIpv4(),
         ec2.Port.tcp(22),
-        'Allow SSH traffic'
+        'Allow SSH traffic from anywhere'
       );
 
       // EC2 인스턴스 역할
@@ -283,7 +292,7 @@ export class CodeServerCdkStack extends cdk.Stack {
           subnetType: ec2.SubnetType.PUBLIC,
         },
         instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MEDIUM),
-        machineImage: ec2.MachineImage.latestAmazonLinux2(),
+        machineImage: ec2.MachineImage.latestAmazonLinux2023(),
         securityGroup: securityGroup,
         keyName: keyPair.keyName,
         role: role,
@@ -291,18 +300,32 @@ export class CodeServerCdkStack extends cdk.Stack {
 
       // 사용자 데이터 스크립트 추가
       instance.addUserData(
-        'yum update -y',
-        'yum install -y git curl wget gcc gcc-c++ make openssl-devel unzip tar',
+        'dnf update -y',
+        // 기본 개발 도구 설치
+        'dnf groupinstall -y "Development Tools"',
+        'dnf install -y git curl wget gcc gcc-c++ make openssl-devel unzip tar',
+        // Python 설치
+        'dnf install -y python3 python3-pip python3-devel',
+        'pip3 install --upgrade pip setuptools wheel virtualenv',
+        // Java 설치
+        'dnf install -y java-17-amazon-corretto java-17-amazon-corretto-devel maven',
+        // Node.js 설치
+        'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash',
+        'echo "source /root/.nvm/nvm.sh" >> /etc/profile',
+        'export NVM_DIR="$HOME/.nvm"',
+        '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"',
+        'nvm install --lts',
+        'nvm use --lts',
+        // AWS CLI 설치
         'curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" -s',
         'unzip -q awscliv2.zip',
         './aws/install',
         'rm -rf aws awscliv2.zip',
-        'echo "PermitRootLogin prohibit-password" >> /etc/ssh/sshd_config',
-        'echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config',
+        // SSH 보안 설정
+        'echo "PermitRootLogin no" >> /etc/ssh/sshd_config',
         'echo "PasswordAuthentication no" >> /etc/ssh/sshd_config',
-        'echo "ChallengeResponseAuthentication no" >> /etc/ssh/sshd_config',
-        'systemctl restart sshd',
-        'systemctl reload ssh.service'
+        'echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config',
+        'systemctl restart sshd'
       );
 
       // EC2 관련 Output
