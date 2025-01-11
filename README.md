@@ -1,6 +1,6 @@
 # Dev Environment CDK
 
-이 프로젝트는 AWS CDK를 사용하여 개발 환경을 구축합니다. ECS Fargate 또는 EC2를 선택하여 배포할 수 있으며, VS Code Remote SSH를 통해 원격 개발 환경에 접속할 수 있습니다.
+이 프로젝트는 AWS CDK를 사용하여 EC2 기반의 개발 환경을 구축합니다. VS Code Remote SSH를 통해 원격 개발 환경에 접속할 수 있습니다.
 
 ## 아키텍처
 
@@ -9,49 +9,18 @@
 1. **VPC**
 
    - 2개의 가용영역(AZ)에 걸친 고가용성 구성
+   - 각 AZ에 Public 서브넷
    - VPC Flow Logs 활성화로 네트워크 트래픽 모니터링
 
-   Fargate 배포의 경우:
-
-   - 각 AZ에 Public 및 Private 서브넷
-   - NAT Gateway를 통한 Private 서브넷의 외부 통신
-
-   EC2 배포의 경우:
-
-   - 각 AZ에 Public 서브넷
-
-2. **컴퓨팅 (Fargate 또는 EC2)**
-
-   Fargate 배포의 경우:
-
-   - Private 서브넷에 컨테이너 배치
-   - Container Insights 활성화로 모니터링 강화
-   - CloudWatch Logs 통합
-   - Amazon Linux 2 기반 컨테이너
-   - 개발 도구 사전 설치 (Python, Java, Node.js)
-
-   EC2 배포의 경우:
+2. **EC2 인스턴스**
 
    - Public 서브넷에 EC2 인스턴스 배치
    - Amazon Linux 2023 기반
    - T3.medium 인스턴스 타입
    - 개발 도구 사전 설치 (Python, Java, Node.js)
+   - SSH를 통한 접근
 
-3. **네트워크 접근**
-
-   Fargate 배포의 경우:
-
-   - Network Load Balancer 사용
-   - Public 서브넷에 위치
-   - SSH 트래픽 처리 (포트 22)
-   - TCP 기반 상태 확인
-
-   EC2 배포의 경우:
-
-   - 퍼블릭 IP 직접 할당
-   - SSH 포트(22) 직접 접근
-
-4. **보안**
+3. **보안**
    - SSH 키 기반 인증
    - 세분화된 보안 그룹 규칙
    - IAM 역할 및 정책 최소 권한 원칙 적용
@@ -81,22 +50,10 @@
 2. CDK 배포
 
    ```bash
-   # Fargate로 배포 (기본값)
    cdk deploy
-
-   # EC2로 배포
-   cdk deploy -c deploymentType=ec2
    ```
 
 3. 배포가 완료되면 다음 정보가 출력됩니다:
-
-   Fargate 배포의 경우:
-
-   - Network Load Balancer의 DNS 이름
-   - SSH 키 페어 이름
-   - SSH 키 다운로드 명령어
-
-   EC2 배포의 경우:
 
    - EC2 인스턴스의 퍼블릭 IP 주소
    - SSH 키 페어 이름
@@ -115,14 +72,6 @@
    ```
 
 5. SSH로 접속:
-
-   Fargate 배포의 경우:
-
-   ```bash
-   ssh -i <SSHKeyName>.pem root@<LoadBalancerDNS>
-   ```
-
-   EC2 배포의 경우:
 
    ```bash
    ssh -i <SSHKeyName>.pem ec2-user@<InstancePublicIP>
@@ -175,8 +124,8 @@ mvn archetype:generate
 사용 예시:
 
 ```bash
-# EC2의 경우
-source /etc/profile  # nvm 활성화
+# nvm 활성화
+source /etc/profile
 
 # Node.js 버전 확인
 node --version
@@ -192,7 +141,7 @@ nvm install <version>
 - wget
 - gcc/g++
 - make
-- Development Tools (EC2의 경우)
+- Development Tools
 - AWS CLI v2
 
 ## VS Code Remote SSH 설정
@@ -201,40 +150,16 @@ nvm install <version>
 
 2. `~/.ssh/config` 파일에 다음 내용을 추가합니다:
 
-   Fargate 배포의 경우:
-
-   ```
-   Host dev-container
-     HostName <your-nlb-dns-name>
-     User root
-     IdentityFile /pathto/<SSHKeyName>.pem
-   ```
-
-   EC2 배포의 경우:
-
    ```
    Host dev-instance
      HostName <your-instance-public-ip>
      User ec2-user
-     IdentityFile /pathto/<SSHKeyName>.pem
+     IdentityFile ~/.ssh/<SSHKeyName>.pem
    ```
 
-3. VS Code 명령 팔레트(F1)에서 "Remote-SSH: Connect to Host"를 선택하고 배포 타입에 따라 "dev-container" 또는 "dev-instance"를 선택합니다.
+3. VS Code 명령 팔레트(F1)에서 "Remote-SSH: Connect to Host"를 선택하고 "dev-instance"를 선택합니다.
 
 ## 모니터링
-
-Fargate 배포의 경우:
-
-1. **Container Insights**
-
-   - ECS 콘솔에서 Container Insights를 통해 컨테이너 메트릭 확인
-   - CPU, 메모리, 네트워크 사용량 등 모니터링
-
-2. **CloudWatch Logs**
-   - 컨테이너 로그는 CloudWatch Logs에서 확인 가능
-   - 로그 그룹: `/aws/ecs/dev-container`
-
-EC2 배포의 경우:
 
 1. **CloudWatch Metrics**
 
@@ -267,7 +192,7 @@ EC2 배포의 경우:
 1. **Node.js 관련 문제**
 
    ```bash
-   # nvm 활성화 (EC2의 경우)
+   # nvm 활성화
    source /etc/profile
 
    # Node.js 재설치
@@ -294,7 +219,7 @@ EC2 배포의 경우:
 4. **SSH 접속 문제**
    - 키 파일 권한이 400인지 확인
    - 보안 그룹 인바운드 규칙 확인
-   - 올바른 사용자 이름 사용 (EC2: ec2-user, Fargate: root)
+   - 올바른 사용자 이름 사용 (ec2-user)
 
 ## 참고 자료
 
