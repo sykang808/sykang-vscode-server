@@ -89,49 +89,94 @@
 - python3-devel (개발 헤더 및 라이브러리)
 - setuptools, wheel
 
+시스템 설정:
+
+- Python 패키지 디렉토리에 대한 적절한 권한 설정
+- 모든 사용자가 Python 패키지 사용 가능
+
 사용 예시:
 
 ```bash
+# Python 버전 확인
+python3 --version
+
 # 가상환경 생성
 python3 -m venv myenv
 source myenv/bin/activate
 
 # 패키지 설치
 pip install <package-name>
+
+# 시스템 전역 패키지 설치
+sudo pip3 install <package-name>
 ```
 
 ### 2. Java 개발 환경
 
 - Amazon Corretto JDK 17
 - Maven
+- 개발 도구 및 라이브러리
+
+시스템 설정:
+
+- JAVA_HOME이 /usr/lib/jvm/java-17-amazon-corretto로 설정됨
+- Java 실행 파일이 시스템 PATH에 추가됨
+- 모든 사용자가 Java 개발 도구 사용 가능
 
 사용 예시:
 
 ```bash
 # Java 버전 확인
 java -version
+javac -version
+
+# Maven 버전 및 설정 확인
+mvn -version
 
 # Maven 프로젝트 생성
 mvn archetype:generate
+
+# Java 환경변수 확인
+echo $JAVA_HOME
 ```
 
 ### 3. Node.js 개발 환경
 
-- nvm (Node Version Manager)
-- Node.js LTS 버전
-- npm
+- Node.js 20.x LTS 버전 (NodeSource 저장소)
+- npm (패키지 매니저)
+- yarn (대체 패키지 매니저)
+- 글로벌 개발 도구:
+  - TypeScript & ts-node (타입스크립트 실행 환경)
+  - nodemon (개발 시 자동 재시작)
+  - pm2 (프로세스 매니저)
+  - @types/node (타입 정의)
+
+시스템 설정:
+
+- NODE_PATH가 /usr/lib/node_modules로 설정됨
+- 글로벌 패키지 실행 파일이 PATH에 추가됨
+- 모든 사용자가 Node.js와 글로벌 패키지 사용 가능
 
 사용 예시:
 
 ```bash
-# nvm 활성화
-source /etc/profile
-
 # Node.js 버전 확인
 node --version
 
-# 다른 Node.js 버전 설치
-nvm install <version>
+# 글로벌 패키지 설치
+npm install -g <package-name>
+yarn global add <package-name>
+
+# TypeScript 프로젝트 실행
+ts-node src/index.ts
+
+# 개발 모드로 실행 (자동 재시작)
+nodemon src/index.ts
+
+# PM2로 프로세스 관리
+pm2 start app.js --name "my-app"
+pm2 list
+pm2 monit
 ```
 
 ### 4. 기본 개발 도구
@@ -154,21 +199,34 @@ nvm install <version>
    Host dev-instance
      HostName <your-instance-public-ip>
      User ec2-user
-     IdentityFile ~/.ssh/<SSHKeyName>.pem
+     IdentityFile ~/.ssh/CodeServerCdkStack-key.pem
    ```
 
 3. VS Code 명령 팔레트(F1)에서 "Remote-SSH: Connect to Host"를 선택하고 "dev-instance"를 선택합니다.
 
 ## 모니터링
 
-1. **CloudWatch Metrics**
+1. **CloudWatch Agent**
 
-   - EC2 메트릭을 통해 인스턴스 상태 확인
-   - CPU, 메모리, 네트워크 사용량 등 모니터링
+   - 자동 설치 및 구성
+   - 60초 간격으로 메트릭 수집
+   - 수집되는 메트릭:
+     - CPU: idle, user, system 사용률
+     - 메모리: 총량, 사용량, 사용률
+     - 디스크: 총량, 사용량, 사용률
+   - root 사용자로 실행되어 모든 시스템 메트릭 접근 가능
 
-2. **VPC Flow Logs**
+2. **CloudWatch Metrics**
+
+   - EC2 기본 메트릭 모니터링
+   - CloudWatch Agent를 통한 상세 시스템 메트릭 수집
+   - 실시간 리소스 사용량 모니터링
+   - 대시보드를 통한 시각화 가능
+
+3. **VPC Flow Logs**
    - VPC 네트워크 트래픽 모니터링
    - 보안 분석 및 문제 해결에 활용
+   - CloudWatch Logs에 자동 저장
 
 ## 보안 설정
 
@@ -192,11 +250,24 @@ nvm install <version>
 1. **Node.js 관련 문제**
 
    ```bash
-   # nvm 활성화
-   source /etc/profile
+   # Node.js 완전 재설치
+   sudo rm -rf /usr/lib/node_modules/*
+   sudo dnf remove -y nodejs npm
+   sudo dnf clean all && sudo dnf makecache
+   curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+   sudo dnf install -y nodejs
 
-   # Node.js 재설치
-   nvm install --lts
+   # 글로벌 패키지 재설치
+   sudo npm install -g yarn typescript ts-node nodemon pm2 @types/node
+
+   # 권한 재설정
+   sudo find /usr/lib/node_modules -type d -exec chmod 755 {} \;
+   sudo find /usr/lib/node_modules -type f -exec chmod 644 {} \;
+   sudo chmod 755 /usr/bin/node /usr/bin/npm /usr/bin/npx
+
+   # 환경 변수 확인
+   echo $NODE_PATH
+   node --version
    ```
 
 2. **Python 가상환경 문제**
