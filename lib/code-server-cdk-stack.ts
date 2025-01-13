@@ -61,6 +61,10 @@ export class CodeServerCdkStack extends cdk.Stack {
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchAgentServerPolicy'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AWSCloudFormationFullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3FullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2FullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('IAMFullAccess'),
       ],
       inlinePolicies: {
         'ec2-permissions': new iam.PolicyDocument({
@@ -83,6 +87,32 @@ export class CodeServerCdkStack extends cdk.Stack {
       },
     });
 
+    // VPC 엔드포인트 생성
+    new ec2.InterfaceVpcEndpoint(this, 'SSMEndpoint', {
+      vpc,
+      service: ec2.InterfaceVpcEndpointAwsService.SSM,
+      privateDnsEnabled: true,
+    });
+
+    new ec2.InterfaceVpcEndpoint(this, 'SSMMessagesEndpoint', {
+      vpc,
+      service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
+      privateDnsEnabled: true,
+    });
+
+    new ec2.InterfaceVpcEndpoint(this, 'EC2MessagesEndpoint', {
+      vpc,
+      service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES,
+      privateDnsEnabled: true,
+    });
+
+    // 보안 그룹 규칙 강화
+    securityGroup.addIngressRule(
+      ec2.Peer.ipv4('0.0.0.0/0'),
+      ec2.Port.tcp(443),
+      'Allow HTTPS traffic for SSM'
+    );
+
     // EC2 인스턴스 생성
     const instance = new ec2.Instance(this, 'DevInstance', {
       vpc,
@@ -94,7 +124,21 @@ export class CodeServerCdkStack extends cdk.Stack {
       securityGroup: securityGroup,
       keyPair: keyPair,
       role: role,
+      requireImdsv2: true, // IMDSv2 강제 적용
+      blockDevices: [
+        {
+          deviceName: '/dev/xvda',
+          volume: ec2.BlockDeviceVolume.ebs(30, {
+            encrypted: true, // EBS 암호화 활성화
+            volumeType: ec2.EbsDeviceVolumeType.GP3,
+          }),
+        },
+      ],
     });
+
+    // 태그 추가
+    cdk.Tags.of(instance).add('Environment', 'Development');
+    cdk.Tags.of(instance).add('SecurityLevel', 'High');
 
     // 사용자 데이터 스크립트 추가
     instance.addUserData(
@@ -147,7 +191,8 @@ export class CodeServerCdkStack extends cdk.Stack {
       '{',
       '  "agent": {',
       '    "metrics_collection_interval": 60,',
-      '    "run_as_user": "root"',
+      '    "run_as_user": "root",',
+      '    "logfile": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log"',
       '  },',
       '  "metrics": {',
       '    "metrics_collected": {',
@@ -176,6 +221,32 @@ export class CodeServerCdkStack extends cdk.Stack {
       '          "mem_used"',
       '        ],',
       '        "metrics_collection_interval": 60',
+      '      }',
+      '    }',
+      '  },',
+      '  "logs": {',
+      '    "logs_collected": {',
+      '      "files": {',
+      '        "collect_list": [',
+      '          {',
+      '            "file_path": "/var/log/messages",',
+      '            "log_group_name": "/ec2/system/messages",',
+      '            "log_stream_name": "{instance_id}",',
+      '            "retention_in_days": 7',
+      '          },',
+      '          {',
+      '            "file_path": "/var/log/secure",',
+      '            "log_group_name": "/ec2/system/secure",',
+      '            "log_stream_name": "{instance_id}",',
+      '            "retention_in_days": 7',
+      '          },',
+      '          {',
+      '            "file_path": "/var/log/user-data.log",',
+      '            "log_group_name": "/ec2/user-data",',
+      '            "log_stream_name": "{instance_id}",',
+      '            "retention_in_days": 7',
+      '          }',
+      '        ]',
       '      }',
       '    }',
       '  }',
